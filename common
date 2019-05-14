@@ -1,0 +1,100 @@
+#!/bin/bash
+# Common
+# Stores common data structures
+
+## Arrays ##
+
+declare -A domain_info
+declare -A badaddresses
+
+## Functions ##
+
+# Prints a list of domains present in $HOME/mail
+
+get_domains(){
+    find $HOME/etc/ -regextype posix-egrep -regex '(\/\w+){4}\.(((?!rc )\w+\.\w+)|\w+$)' \
+    | cut -d'/' -f5
+}
+
+# Prints a list of addresses present in $HOME/mail
+
+get_addresses(){
+    find $HOME/mail/*/ -maxdepth 1 -regextype posix-egrep  -regex '(\/\w+){4}\.\w+\/\S+' \
+    | awk 'BEGIN {FS="/"; OFS="@"} {print $6, $5}'
+}
+
+# Prints DNS info with trailing "." trimmed
+# get_mx $domain $record
+
+get_dns(){
+    dig +nocmd $1 $2 +multiline +noall +answer | sed -r 's/\.(\s|$)/ /g'
+}
+
+get_spf(){
+    spf="$(dig $1 txt | awk -F'"' '/spf/{print $2}')"
+}
+
+get_dkim(){
+    dkim=$(dig "${2:-default}._domainkey.${1}" txt +nocmd +short \
+    | awk -F';|=|"|\\\\' '{print $9$11}')
+    pretty_dkim="-----BEGIN PUBLIC KEY-----\n\
+    $dkim\n\
+    -----END PUBLIC KEY-----"
+}
+
+get_dmarc(){
+    dmarc=$(dig findmypolitician.org txt +noall +answer +short | grep 'DMARC' | tr -d \")
+}
+
+# TODO make this output nicer
+# Grabs and prints sizes
+
+get_size(){
+    du -sh $HOME/mail/$1/$2
+}
+
+# Confirmation
+
+confirm(){
+    while true; do
+        read -ep "$1 [yY/nN] " choice
+        case "$choice" in
+            y|Y )
+                echo "yes"
+                return
+            ;;
+            n|N )
+                echo "no"
+                break 2
+            ;;
+            * )
+                echo "Invalid input, please try again." >&2
+            ;;
+        esac
+    done
+}
+
+# Runs some checks on addresses in shadow and passwd for a given domain
+# hash_checker domain (passwd|shadow) (passwd|shadow)
+# TODO add perm checking to these 2 files
+
+hash_checker(){
+    for address in $(awk -F':' '{print $1}' $HOME/etc/$1/$2); do
+        if grep -q $address $HOME/etc/$domain/$3 && \
+        [[ -e $HOME/mail/$1/$address ]]; then
+            continue
+        else
+            badaddresses["$domain"]+="$address "
+        fi
+    done
+}
+
+# Pairs $address@$domain and pairs with domain in domain_info array
+# TODO look in passwd, shadow, and maildir for addresses then compare
+# TODO find a way to capture domain list from /var/cpanel/userdata/$(whoami)/main
+
+for i in $(get_addresses); do
+    address=${i%@*}
+    domain=${i#*@}
+    domain_info["$domain"]+="$address "
+done

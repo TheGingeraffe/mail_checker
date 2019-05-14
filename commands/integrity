@@ -1,0 +1,119 @@
+#!/bin/bash
+# Integrity
+# Tests existence of $HOME/etc/$domain/{passwd,shadow}
+# Checks for presence of addresses in $HOME/etc/$domain/{passwd,shadow}
+# Recreates addresses using uapi
+
+. "$mailchk_workdir/common"
+
+# Checks domains given from stdin
+
+if [[ ! -z "$2" ]]; then
+    for domain in ${@:2}; do
+        if [[ -e $HOME/etc/$domain/passwd ]] && \
+        [[ -e $HOME/etc/$domain/shadow ]]; then
+            hash_checker $domain shadow passwd
+            hash_checker $domain passwd shadow
+        else
+            echo -e "\nThere is something wrong with the shadow/passwd files for ${domain}. \
+            Check that they exist and that permissions are correct.\n" \
+            | fold -w 80 -s
+        fi
+    done
+    if [[ "${#badaddresses[@]}" > 0 ]]; then
+        echo -e "\nThese addresses may have issues. Check that \
+the address exists in $HOME/mail/\$DOMAIN, has entries in \
+        $HOME/etc/\$DOMAIN/{shadow,passwd}, and that permissions are correct.\n" \
+        | fold -w 80 -s
+        for domain in "${!badaddresses[@]}"; do
+            for address in ${badaddresses["$domain"]}; do
+                echo $address@$domain
+            done
+        done
+        echo
+        answer=$(confirm "Would you like to attempt to repair these addresses? \
+        WARNING: This will reset the password for each repaired address.")
+        echo
+        if [[ $answer == "yes" ]]; then
+            for domain in "${!badaddresses[@]}"; do
+                cp $HOME/etc/$domain/passwd{,.$(date +%s).bak}
+                cp $HOME/etc/$domain/shadow{,.$(date +%s).bak}
+                for address in ${badaddresses["$domain"]}; do
+                    if egrep -q "^$address:" $HOME/etc/$domain/{shadow,passwd}; then
+                        echo -e "$address@$domain is in $(egrep -l "^$address:" $HOME/etc/$domain/{shadow,passwd}), removing entry\n"
+                        sed -i "/^$address/d" $HOME/etc/$domain/shadow
+                        sed -i "/^$address/d" $HOME/etc/$domain/passwd
+                        uapi Email add_pop \
+                        email=${address%@*} \
+                        password='echo $(cat /dev/urandom | tr -dc '[:upper:][:lower:][:digit:][:punct:]' | fold -w 12 | head -1)' \
+                        quota=0 \
+                        domain="$domain" \
+                        skip_update_db=1 &>/dev/null &&\
+                        echo -e "$address@$domain successfully regenerated\n" ||\
+                        echo -e "$address@$domain creation failed\n"
+                    fi
+                done
+            done
+        fi
+    else
+        echo -e "\nAll addresses for domains on the account passed are found in \
+        $HOME/etc/$domain/{shadow,passwd} and in $HOME/mail/$domain."
+    fi
+
+# Checks domains given from domain_info array    
+
+else
+    
+    for domain in "${!domain_info[@]}"; do
+        if [[ -e $HOME/etc/$domain/passwd ]] && \
+        [[ -e $HOME/etc/$domain/shadow ]]; then
+            hash_checker $domain shadow passwd
+            hash_checker $domain passwd shadow
+        else
+            echo -e "\nThere is something wrong with the shadow/passwd files for ${domain}. \
+            Check that they exist and that permissions are correct.\n" \
+            | fold -w 80 -s
+        fi
+    done
+    
+    if [[ "${#badaddresses[@]}" > 0 ]]; then
+        echo -e "\nThese addresses may have issues. Check that\
+ the address exists in $HOME/mail/\$DOMAIN, has entries in\
+        $HOME/etc/\$DOMAIN/{shadow,passwd}, and that permissions are correct.\n" \
+        | fold -w 80 -s
+        for domain in "${!badaddresses[@]}"; do
+            for address in ${badaddresses["$domain"]}; do
+                echo $address@$domain
+            done
+        done
+        echo
+        answer=$(confirm "Would you like to attempt to repair these addresses? \
+        WARNING: This will reset the password for each repaired address.")
+        echo
+        if [[ $answer == "yes" ]]; then
+            for domain in "${!badaddresses[@]}"; do
+                cp $HOME/etc/$domain/passwd{,.$(date +%s).bak}
+                cp $HOME/etc/$domain/shadow{,.$(date +%s).bak}
+                for address in ${badaddresses["$domain"]}; do
+                    if egrep -q "^$address:" $HOME/etc/$domain/{shadow,passwd}; then
+                        echo -e "$address@$domain is in $(egrep -l "^$address:" $HOME/etc/$domain/{shadow,passwd}), removing entry\n"
+                        sed -i "/^$address/d" $HOME/etc/$domain/shadow
+                        sed -i "/^$address/d" $HOME/etc/$domain/passwd
+                        uapi Email add_pop \
+                        email=${address%@*} \
+                        password='echo $(cat /dev/urandom | tr -dc '[:upper:][:lower:][:digit:][:punct:]' | fold -w 12 | head -1)' \
+                        quota=0 \
+                        domain="$domain" \
+                        skip_update_db=1 &>/dev/null &&\
+                        echo -e "$address@$domain successfully regenerated\n" ||\
+                        echo -e "$address@$domain creation failed\n"
+                    fi
+                done
+            done
+        fi
+    else
+        echo -e "\nAll addresses for domains on the account passed are found in \
+        $HOME/etc/\$DOMAIN/{shadow,passwd} and in $HOME/mail/\$DOMAIN."
+    fi
+fi
+echo

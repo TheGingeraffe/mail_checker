@@ -1,0 +1,40 @@
+#!/bin/bash
+# Breakdown
+# Provides storage breakdown on a per domain and address basis
+
+. "$mailchk_workdir/common"
+
+for domain in "${!domain_info[@]}"; do
+    echo -e "\nThese addresses are present in ${HOME}/mail/${domain}:"
+    echo
+    for address in $(echo "${domain_info[$domain]}"); do
+        echo "${address}@${domain}"
+    done
+done
+
+# Total size of each domain
+
+echo -e "\nTotal mail size by domain:\n"
+
+for domain in "${!domain_info[@]}"; do
+    echo "$(get_size $domain)"
+done
+
+# Total size of each address in $HOME/mail
+
+echo -e "\nTotal mail size by address:\n"
+
+for domain in "${!domain_info[@]}"; do
+    for address in $(echo "${domain_info[$domain]}"); do
+        echo "${address}@${domain} - $(get_size $domain $address)"
+    done
+    echo
+done
+
+# TODO du breakdown of each mailbox
+
+# TODO mail count for address + each box, inbox/sent/trash
+
+# TODO quotas
+
+# TODO accept domain or address as parameter

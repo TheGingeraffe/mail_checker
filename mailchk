@@ -1,0 +1,43 @@
+#!/bin/bash
+# Mailchk
+
+set -e
+export mailchk_workdir=$(cd $(dirname $0) && pwd)
+
+. "$mailchk_workdir/common"
+
+cli_help() {
+    cli_name=${0##*/}
+    echo "
+$cli_name
+cPanel Mail Checker CLI
+Version: $(cat $mailchk_workdir/VERSION)
+https://github.com/TheGingeraffe/mail_checker/
+
+Usage: $cli_name [command]
+
+Commands:
+  *               Help
+  -(d)ns          DNS Check
+  -(b)reakdown    Storage breakdown
+  -(i)ntegrity    Shadow/passwd/maildir checks
+    "
+    exit 1
+}
+
+# Logs/config here?
+
+case "$1" in
+    -breakdown|-b)
+        "$mailchk_workdir/commands/breakdown"
+    ;;
+    -dns|-d)
+        "$mailchk_workdir/commands/dns_check" "$@"
+    ;;
+    -integrity|-i)
+        "$mailchk_workdir/commands/integrity" "$@"
+    ;;
+    *)
+        cli_help
+    ;;
+esac

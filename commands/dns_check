@@ -1,0 +1,76 @@
+#!/bin/bash
+# DNS_check
+# Performs NS, MX, SPF, DKIM, and DMARC lookups
+
+. "$mailchk_workdir/common"
+
+# Performs lookups on domains given from stdin
+
+if [[ ! -z "$2" ]]; then
+    for domain in ${@:2}; do
+        echo -e "\nDNS checks for ${domain}:\n\nNS:\n"
+        get_dns $domain ns
+        echo -e "\nMX:\n"
+        get_dns $domain mx
+        echo
+        get_spf $domain
+        if [[ ${#spf} > 0 ]]; then
+            echo -e "SPF:\n\n$spf"
+        else
+            echo -e "$domain does not appear to have an SPF configured!"
+        fi
+        get_dkim $domain
+        if [[ ${#dkim} > 0 ]]; then
+            echo -e "\nDKIM:\n"
+            echo -e "$pretty_dkim" | fold -w 64 | openssl rsa -noout -text -pubin | head -1
+            echo -e "\n$pretty_dkim" | fold -w 64
+        else
+            echo -e "\n$domain does not appear to have a DKIM configured!"
+        fi
+        get_dmarc $domain
+        if [[ ${#dmarc} > 0 ]]; then
+            echo -e "\nDMARC:\n\n$dmarc"
+        else
+            echo -e "\n$domain does not appear to have a DMARC configured!"
+        fi
+        echo
+    done
+
+# Performs lookups on domains given from domain_info array
+
+else
+    for domain in "${!domain_info[@]}"; do
+        echo -e "\nDNS checks for ${domain}:\n\nNS:\n"
+        get_dns $domain ns
+        echo -e "\nMX:\n"
+        get_dns $domain mx
+        echo
+        get_spf $domain
+        if [[ ${#spf} > 0 ]]; then
+            echo -e "SPF:\n\n$spf"
+        else
+            echo -e "$domain does not appear to have an SPF configured!"
+        fi
+        get_dkim $domain
+        if [[ ${#dkim} > 0 ]]; then
+            echo -e "\nDKIM:\n"
+            echo -e "$pretty_dkim" | fold -w 64 | openssl rsa -noout -text -pubin | head -1
+            echo -e "\n$pretty_dkim" | fold -w 64
+        else
+            echo -e "\n$domain does not appear to have a DKIM configured!"
+        fi
+        get_dmarc $domain
+        if [[ ${#dmarc} > 0 ]]; then
+            echo -e "\nDMARC:\n\n$dmarc"
+        else
+            echo -e "\n$domain does not appear to have a DMARC configured!"
+        fi
+        echo
+    done
+fi
+
+# Domains that error go here:
+
+# Ask for DKIM selector when run, or just assume default?
+# Possible selectors: default, google, dkim
+# TODO get dns from auth NS via WHOIS (waiting on WHOIS segfault fix)

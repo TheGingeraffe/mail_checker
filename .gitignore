@@ -1,0 +1,6 @@
+*.log
+config
+*.bak
+commands/{maybe,miscfeatures,perms}
+test/
+.code-workspace.code-workspace
